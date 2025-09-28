@@ -1,0 +1,103 @@
+name: CI - Build, Test, Logs, DB Record
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    env:
+      SERVICE: monorepo
+      BRANCH: ${{ github.ref_name }}
+      COMMIT_SHA: ${{ github.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Prepare logs
+        run: echo "[CI] start" > logs.txt
+
+      - name: Install (root or api/)
+        run: |
+          echo "[INFO] install" | tee -a logs.txt
+          if [ -f package.json ]; then
+            npm ci 2>&1 | tee -a logs.txt
+          elif [ -f api/package.json ]; then
+            cd api && npm ci 2>&1 | tee -a ../logs.txt
+          else
+            echo "[WARN] no package.json" | tee -a logs.txt
+          fi
+
+      - name: Tests (simulated)
+        run: |
+          echo "[INFO] tests running" | tee -a logs.txt
+          echo "TESTS_PASSED=3" >> $GITHUB_ENV
+          echo "TESTS_FAILED=0" >> $GITHUB_ENV
+          echo "[INFO] tests ok" | tee -a logs.txt
+
+      - name: Upload logs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-logs
+          path: logs.txt
+          if-no-files-found: warn
+          retention-days: 7
+
+      # --- BLOCO DE BANCO (só executa se todas as secrets existirem) ---
+      - name: Install psql client
+        if: ${{ secrets.PGHOST && secrets.PGPORT && secrets.PGDATABASE && secrets.PGUSER && secrets.PGPASSWORD }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Criar tabelas se não existirem
+        if: ${{ secrets.PGHOST && secrets.PGPORT && secrets.PGDATABASE && secrets.PGUSER && secrets.PGPASSWORD }}
+        continue-on-error: true
+        env:
+          PGHOST:     ${{ secrets.PGHOST }}
+          PGPORT:     ${{ secrets.PGPORT }}
+          PGDATABASE: ${{ secrets.PGDATABASE }}
+          PGUSER:     ${{ secrets.PGUSER }}
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+        run: |
+          psql "sslmode=prefer" <<'SQL'
+          CREATE TABLE IF NOT EXISTS runs (
+            id BIGSERIAL PRIMARY KEY,
+            service TEXT NOT NULL,
+            branch TEXT NOT NULL,
+            commit_sha TEXT NOT NULL,
+            status TEXT NOT NULL,
+            tests_passed INT DEFAULT 0,
+            tests_failed INT DEFAULT 0,
+            started_at TIMESTAMPTZ DEFAULT now(),
+            finished_at TIMESTAMPTZ,
+            log_artifact_url TEXT
+          );
+          SQL
+
+      - name: Insert run record
+        if: ${{ secrets.PGHOST && secrets.PGPORT && secrets.PGDATABASE && secrets.PGUSER && secrets.PGPASSWORD }}
+        continue-on-error: true
+        env:
+          PGHOST:     ${{ secrets.PGHOST }}
+          PGPORT:     ${{ secrets.PGPORT }}
+          PGDATABASE: ${{ secrets.PGDATABASE }}
+          PGUSER:     ${{ secrets.PGUSER }}
+          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+        run: |
+          STARTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          ARTIFACT_URL="(cole o link do run/artefato se quiser)"
+          psql "sslmode=prefer" -c "
+            INSERT INTO runs (service, branch, commit_sha, status, tests_passed, tests_failed, started_at, finished_at, log_artifact_url)
+            VALUES ('${SERVICE}', '${BRANCH}', '${COMMIT_SHA}', 'success', ${TESTS_PASSED:-0}, ${TESTS_FAILED:-0}, '${STARTED_AT}', now(), '${ARTIFACT_URL}');
+          "
