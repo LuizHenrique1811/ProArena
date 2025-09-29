@@ -55,7 +55,6 @@ jobs:
 
       # --- BLOCO DE BANCO (só executa se todas as secrets existirem) ---
       - name: Install psql client
-        if: ${{ secrets.PGHOST && secrets.PGPORT && secrets.PGDATABASE && secrets.PGUSER && secrets.PGPASSWORD }}
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-client
