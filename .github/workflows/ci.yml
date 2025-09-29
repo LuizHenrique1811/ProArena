@@ -53,7 +53,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-      # --- BLOCO DE BANCO (só executa se todas as secrets existirem) ---
+      
       - name: Install psql client
         run: |
           sudo apt-get update
@@ -80,13 +80,15 @@ jobs:
           SQL
 
       - name: Insert run record
-        continue-on-error: true
         if: always() 
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+          JOB_STATUS: ${{ job.status }}
         run: |
           STARTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          
           ARTIFACT_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          
           psql "$DATABASE_URL?sslmode=require" -c "
             INSERT INTO runs (service, branch, commit_sha, status, tests_passed, tests_failed, started_at, finished_at, log_artifact_url)
             VALUES ('${SERVICE}', '${BRANCH}', '${COMMIT_SHA}', '${JOB_STATUS}', ${TESTS_PASSED:-0}, ${TESTS_FAILED:-0}, '${STARTED_AT}', now(), '${ARTIFACT_URL}');
