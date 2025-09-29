@@ -64,7 +64,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          psql "sslmode=prefer" <<'SQL'
+          psql "$DATABASE_URL?sslmode=require" <<'SQL'
           CREATE TABLE IF NOT EXISTS runs (
             id BIGSERIAL PRIMARY KEY,
             service TEXT NOT NULL,
@@ -81,12 +81,13 @@ jobs:
 
       - name: Insert run record
         continue-on-error: true
+        if: always() 
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           STARTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          ARTIFACT_URL="(cole o link do run/artefato se quiser)"
-          psql "sslmode=prefer" -c "
+          ARTIFACT_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          psql "$DATABASE_URL?sslmode=require" -c "
             INSERT INTO runs (service, branch, commit_sha, status, tests_passed, tests_failed, started_at, finished_at, log_artifact_url)
-            VALUES ('${SERVICE}', '${BRANCH}', '${COMMIT_SHA}', 'success', ${TESTS_PASSED:-0}, ${TESTS_FAILED:-0}, '${STARTED_AT}', now(), '${ARTIFACT_URL}');
+            VALUES ('${SERVICE}', '${BRANCH}', '${COMMIT_SHA}', '${JOB_STATUS}', ${TESTS_PASSED:-0}, ${TESTS_FAILED:-0}, '${STARTED_AT}', now(), '${ARTIFACT_URL}');
           "
