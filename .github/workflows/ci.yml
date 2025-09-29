@@ -60,7 +60,6 @@ jobs:
           sudo apt-get install -y postgresql-client
 
       - name: Criar tabelas se não existirem
-        if: ${{ secrets.PGHOST && secrets.PGPORT && secrets.PGDATABASE && secrets.PGUSER && secrets.PGPASSWORD }}
         continue-on-error: true
         env:
           PGHOST:     ${{ secrets.PGHOST }}
@@ -85,7 +84,6 @@ jobs:
           SQL
 
       - name: Insert run record
-        if: ${{ secrets.PGHOST && secrets.PGPORT && secrets.PGDATABASE && secrets.PGUSER && secrets.PGPASSWORD }}
         continue-on-error: true
         env:
           PGHOST:     ${{ secrets.PGHOST }}
