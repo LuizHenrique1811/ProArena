@@ -62,11 +62,7 @@ jobs:
       - name: Criar tabelas se não existirem
         continue-on-error: true
         env:
-          PGHOST:     ${{ secrets.PGHOST }}
-          PGPORT:     ${{ secrets.PGPORT }}
-          PGDATABASE: ${{ secrets.PGDATABASE }}
-          PGUSER:     ${{ secrets.PGUSER }}
-          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           psql "sslmode=prefer" <<'SQL'
           CREATE TABLE IF NOT EXISTS runs (
@@ -86,11 +82,7 @@ jobs:
       - name: Insert run record
         continue-on-error: true
         env:
-          PGHOST:     ${{ secrets.PGHOST }}
-          PGPORT:     ${{ secrets.PGPORT }}
-          PGDATABASE: ${{ secrets.PGDATABASE }}
-          PGUSER:     ${{ secrets.PGUSER }}
-          PGPASSWORD: ${{ secrets.PGPASSWORD }}
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           STARTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           ARTIFACT_URL="(cole o link do run/artefato se quiser)"
